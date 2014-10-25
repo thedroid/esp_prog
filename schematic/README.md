@@ -10,7 +10,7 @@ Note that, we silently assume that GPIO2 and GPIO15 are pulled high during syste
 ## Diagram
 
 FTDI |Connection| ESP8266 | Note
------|:----------:|---------|------
+:-----:|:----------:|:---------:|------
 TX   |   ----   | RX      |
 RX   |   ----   | TX      | 
 RTS  | 220Ohm | Reset   | see considerations
@@ -30,7 +30,7 @@ The following pinout of the ISP is optimized for the usage of the ESP-03/4 board
 Pin header on the PCB (top view):
 
 Description |   |   | Description
-------------|---|---|------------
+------------:|:---:|:---:|:------------
 Vss         | 1 | 2 | Tx
 Rx          | 3 | 4 | /Reset
 Vdd         | 5 | 6 | GPIO0
