@@ -9,7 +9,7 @@ Note that, we silently assume that GPIO2 and GPIO15 are pulled high during syste
 
 ## Diagram
 
-FTDI |              | ESP8266 | Note
+FTDI |  Connection  | ESP8266 | Note
 -----|--------------|---------|------
 TX   |     ----     | RX      |
 RX   |     ----     | TX      | 
