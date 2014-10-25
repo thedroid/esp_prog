@@ -20,7 +20,7 @@ GND  |   ----   | Vss     |
 
 
 ## Considerations
-Open-drain output for DTR/RTS would be ideal for a true In System Programmer (ISP). In dormant state they would leave the actual circuit unaffected. However, the lines are active low. Meaning that during inactivity the lines are high. A double inverting MOSFET stage would be required to accomplish the desired behavior. As the same issues holds for the TX line I currently decided to go with the simple and cheap solution: resistors. The more advanced solution would be driver IC which switches RTS, DTR, and TX into a Tri-Z state. The driver could be controlled by the DTR line.
+Open-drain output for DTR/RTS would be ideal for a true In System Programmer (ISP). In dormant state they would leave the actual circuit unaffected. However, the lines are active low. Meaning that during inactivity the lines are high. A double inverting MOSFET stage would be required to accomplish the desired behavior. As the same issues holds for the TX line I currently decided to go with the simple and cheap solution: resistors. The more advanced solution would be a driver IC which switches RTS, DTR, and TX into a Tri-Z state. The driver could be controlled by the DTR line.
 
 ## Pinout
 
