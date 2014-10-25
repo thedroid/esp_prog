@@ -4,6 +4,7 @@
 # https://github.com/themadinventor/esptool
 #
 # Copyright (C) 2014 Fredrik Ahlberg
+# Modified by Juergen Eckert (2014)
 #
 # This program is free software; you can redistribute it and/or modify it under
 # the terms of the GNU General Public License as published by the Free Software
@@ -122,6 +123,16 @@ class ESPROM:
 
     """ Try connecting repeatedly until successful, or giving up """
     def connect(self):
+	print 'Entering bootloader...'
+	self._port.setRTS(True)			#RTS
+	self._port.setDTR(True)			#GPIO0
+	time.sleep(0.25)
+	self._port.setRTS(False)
+	self._port.setDTR(True)
+	time.sleep(0.25)
+        self._port.setRTS(False)
+	self._port.setDTR(False)
+
         print 'Connecting...'
         self._port.timeout = 0.2
         for i in xrange(10):
