@@ -9,14 +9,14 @@ Note that, we silently assume that GPIO2 and GPIO15 are pulled high during syste
 
 ## Diagram
 
-FTDI |  Connection  | ESP8266 | Note
------|--------------|---------|------
-TX   |     ----     | RX      |
-RX   |     ----     | TX      | 
-RTS  | -- 220Ohm -- | Reset   | see below
-DTR  | -- 220Ohm -- | GPIO0   | see below
-Vio  | --  56Ohm -- | Vdd     | Optional. Vio can alternativly be connected to 3.3Vout of the FTDI. Just ensure 3.3V levels.
-GND  |     ----     | Vss     |
+FTDI |Connection| ESP8266 | Note
+-----|----------|---------|------
+TX   |   ----   | RX      |
+RX   |   ----   | TX      | 
+RTS  | -220Ohm- | Reset   | see below
+DTR  | -220Ohm- | GPIO0   | see below
+Vio  | - 56Ohm- | Vdd     | Optional. Vio can alternativly be connected to 3.3Vout of the FTDI. Just ensure 3.3V levels.
+GND  |   ----   | Vss     |
 
 
 ## Considerations
