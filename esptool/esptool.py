@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.7
 #
 # ESP8266 ROM Bootloader Utility
 # https://github.com/themadinventor/esptool
@@ -42,9 +42,9 @@ class ESPROM:
 
     # Maximum block sized for RAM and Flash writes, respectively.
     ESP_RAM_BLOCK   = 0x1800
-    ESP_FLASH_BLOCK = 0x400
+    ESP_FLASH_BLOCK = 0x100
 
-    # Default baudrate used by the ROM. Don't know if it is possible to change.
+    # Default baudrate. The ROM auto-bauds, so we can use more or less whatever we want.
     ESP_ROM_BAUD    = 115200
 
     # First byte of the application image
@@ -53,8 +53,12 @@ class ESPROM:
     # Initial state for the checksum routine
     ESP_CHECKSUM_MAGIC = 0xef
 
-    def __init__(self, port = 0):
-        self._port = serial.Serial(port, self.ESP_ROM_BAUD)
+    # OTP ROM addresses
+    ESP_OTP_MAC0    = 0x3ff00050
+    ESP_OTP_MAC1    = 0x3ff00054
+
+    def __init__(self, port = 0, baud = ESP_ROM_BAUD):
+        self._port = serial.Serial(port, baud)
 
     """ Read bytes from the serial port while performing SLIP unescaping """
     def read(self, length = 1):
@@ -136,6 +140,15 @@ class ESPROM:
 	self._port.setDTR(False)
 
         print 'Connecting...'
+
+        # RTS = CH_PD (i.e reset)
+        # DTR = GPIO0
+        self._port.setRTS(True)
+        self._port.setDTR(True)
+        self._port.setRTS(False)
+        time.sleep(0.1)
+        self._port.setDTR(False)
+
         self._port.timeout = 0.5
         for i in xrange(10):
             try:
@@ -182,9 +195,10 @@ class ESPROM:
     """ Start downloading to Flash (performs an erase) """
     def flash_begin(self, size, offset):
         old_tmo = self._port.timeout
+        num_blocks = (size + ESPROM.ESP_FLASH_BLOCK - 1) / ESPROM.ESP_FLASH_BLOCK
         self._port.timeout = 10
         if self.command(ESPROM.ESP_FLASH_BEGIN,
-                struct.pack('<IIII', size, 0x200, 0x400, offset))[1] != "\0\0":
+                struct.pack('<IIII', size, num_blocks, ESPROM.ESP_FLASH_BLOCK, offset))[1] != "\0\0":
             raise Exception('Failed to enter Flash download mode')
         self._port.timeout = old_tmo
 
@@ -197,8 +211,7 @@ class ESPROM:
     """ Leave flash mode and run/reboot """
     def flash_finish(self, reboot = False):
         pkt = struct.pack('<I', int(not reboot))
-        res = self.command(ESPROM.ESP_FLASH_END, pkt)
-        if res[1] not in ("\0\0", "\x01\x06"):
+        if self.command(ESPROM.ESP_FLASH_END, pkt)[1] != "\0\0":
             raise Exception('Failed to leave Flash mode')
 
     """ Run application code in flash """
@@ -300,6 +313,12 @@ if __name__ == '__main__':
             help = 'Serial port device',
             default = '/dev/ttyUSB0')
 
+    parser.add_argument(
+            '--baud', '-b',
+            help = 'Serial port baud rate',
+            type = arg_auto_int,
+            default = ESPROM.ESP_ROM_BAUD)
+
     subparsers = parser.add_subparsers(
             dest = 'operation',
             help = 'Run esptool {command} -h for additional help')
@@ -354,13 +373,18 @@ if __name__ == '__main__':
             'elf2image',
             help = 'Create an application image from ELF file')
     parser_elf2image.add_argument('input', help = 'Input ELF file')
+    parser_elf2image.add_argument('--output', '-o', help = 'Output filename prefix', type = str)
+
+    parser_read_mac = subparsers.add_parser(
+            'read_mac',
+            help = 'Read MAC address from OTP ROM')
 
     args = parser.parse_args()
 
     # Create the ESPROM connection object, if needed
     esp = None
     if args.operation not in ('image_info','make_image','elf2image'):
-        esp = ESPROM(args.port)
+        esp = ESPROM(args.port, args.baud)
         esp.connect()
 
     # Do the actual work. Should probably be split into separate functions.
@@ -408,13 +432,15 @@ if __name__ == '__main__':
             args.addr_filename = args.addr_filename[2:]
             image = file(filename, 'rb').read()
             print 'Erasing flash...'
-            esp.flash_begin(len(image), address)
-            seq = 0
             blocks = math.ceil(len(image)/float(esp.ESP_FLASH_BLOCK))
+            esp.flash_begin(blocks*esp.ESP_FLASH_BLOCK, address)
+            seq = 0
             while len(image) > 0:
                 print '\rWriting at 0x%08x... (%d %%)' % (address + seq*esp.ESP_FLASH_BLOCK, 100*(seq+1)/blocks),
                 sys.stdout.flush()
-                esp.flash_block(image[0:esp.ESP_FLASH_BLOCK], seq)
+                block = image[0:esp.ESP_FLASH_BLOCK]
+                block = block + '\xe0' * (esp.ESP_FLASH_BLOCK-len(block))
+                esp.flash_block(block, seq)
                 image = image[esp.ESP_FLASH_BLOCK:]
                 seq += 1
             print
@@ -449,16 +475,23 @@ if __name__ == '__main__':
         image.save(args.output)
 
     elif args.operation == 'elf2image':
+        if args.output is None:
+            args.output = args.input + '-'
         e = ELFFile(args.input)
         image = ESPFirmwareImage()
         image.entrypoint = e.get_symbol_addr("call_user_start")
         for section, start in ((".text", "_text_start"), (".data", "_data_start"), (".rodata", "_rodata_start")):
             data = e.load_section(section)
             image.add_segment(e.get_symbol_addr(start), data)
-        image.save(args.input + "-0x00000.bin")
+        image.save(args.output + "0x00000.bin")
         data = e.load_section(".irom0.text")
         off = e.get_symbol_addr("_irom0_text_start") - 0x40200000
         assert off >= 0
-        f = open(args.input + "-0x%05x.bin" % off, "wb")
+        f = open(args.output + "0x%05x.bin" % off, "wb")
         f.write(data)
         f.close()
+
+    elif args.operation == 'read_mac':
+        mac0 = esp.read_reg(esp.ESP_OTP_MAC0)
+        mac1 = esp.read_reg(esp.ESP_OTP_MAC1)
+        print 'MAC: 18:fe:34:%02x:%02x:%02x' % ((mac1 >> 8) & 0xff, mac1 & 0xff, (mac0 >> 24) & 0xff)
